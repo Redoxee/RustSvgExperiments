@@ -1,50 +1,13 @@
-use std::os::windows::thread;
-
 use ggez::{*, graphics::MeshBuilder};
 use glam::*;
 
 use rand::Rng;
 use svg::Document;
 use svg::node::element::Path;
-use svg::node::element::path::{Data, Parameters};
+use svg::node::element::path::Data;
 
-trait ToParameters {
-    fn from(&self) -> Parameters;
-}
-
-impl ToParameters for Vec2 {
-    fn from(&self)->Parameters {
-        Parameters::from((self.x, self.y))
-    }
-}
-
-#[derive(PartialEq, Eq, Hash)]
-struct OrderedPair{
-    p1x : i32,
-    p1y : i32,
-    p2x : i32,
-    p2y : i32,
-}
-
-impl OrderedPair{
-    fn new(p1: Vec2, p2: Vec2) -> OrderedPair{
-        let p1x = (p1.x * 1000_f32) as i32;
-        let p1y = (p1.y * 1000_f32) as i32;
-        let p2x = (p2.x * 1000_f32) as i32;
-        let p2y = (p2.y * 1000_f32) as i32;
-
-        if p1x > p2x {
-            return OrderedPair {p1x:p2x, p1y:p2y, p2x:p1x, p2y: p1y};
-        }
-        else if p1x == p2x {
-            if p1y > p2y {
-                return OrderedPair {p1x:p2x, p1y:p2y, p2x:p1x, p2y: p1y};
-            }
-        }
-
-        return OrderedPair {p1x:p1x, p1y:p1y, p2x:p2x, p2y: p2y};
-    }
-}
+mod utils;
+use crate::utils::*;
 
 struct Shape {
     points:Vec<Vec2>,
@@ -186,9 +149,10 @@ impl Application {
 impl Application
 {
     fn hex_grid(&mut self) {
-        let hex_scale= 5_f32;
-        let grid_size = Vec2::new(7_f32, 7_f32);
-        let child_chance = 0.1;
+        let hex_scale= 4_f32;
+        let grid_size = Vec2::new(20_f32, 4_f32);
+        let child_chance = 0.3;
+        let decay = 0.7;
 
         let hex_half_width = std::f32::consts::FRAC_PI_6.cos() * hex_scale * self.scale;
         let hex_width = hex_half_width * 2_f32;
@@ -207,7 +171,7 @@ impl Application
                 while is_child {
                     is_child = random.gen_range(0_f32..1_f32) > (1_f32 - child_chance);
                     self.add_hexagone(Vec2::new(fx, fy) + base_position, hex_scale * child_scale);
-                    child_scale = child_scale * 0.8;
+                    child_scale = child_scale * decay;
                 }
             }
         }
