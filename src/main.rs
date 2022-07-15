@@ -9,6 +9,9 @@ use svg::node::element::path::Data;
 mod utils;
 use crate::utils::*;
 
+mod font;
+use crate::font::*;
+
 struct Shape {
     points:Vec<Vec2>,
 }
@@ -229,6 +232,8 @@ fn main() {
     let mut c = conf::Conf::new();
     c.window_mode.width = 150_f32 * scale;
     c.window_mode.height = 100_f32 * scale;
+
+    load_font("Media/HersheySans1.svgfont");
 
     let mut application = Application::new(Vec2::new(150_f32,100_f32), scale);
     application.hex_grid();

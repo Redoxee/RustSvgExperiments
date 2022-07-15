@@ -1,4 +1,4 @@
-use svg::node::element::path::Parameters;
+use svg::node::element::path::{Parameters, Data};
 use glam::*;
 
 pub trait ToParameters {
@@ -36,5 +36,24 @@ impl OrderedPair{
         }
 
         return OrderedPair {p1x:p1x, p1y:p1y, p2x:p2x, p2y: p2y};
+    }
+}
+
+pub enum Instruction {
+    MoveTo(Vec2),
+    LineTo(Vec2),
+}
+
+impl Instruction {
+    fn execute_instruction(&self, data: Data) -> Data {
+        match self {
+            Instruction::MoveTo(position) => {
+                data.move_to(ToParameters::from(position))
+            },
+
+            Instruction::LineTo(position) => {
+                data.line_to(ToParameters::from(position))
+            },
+        }
     }
 }
