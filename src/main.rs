@@ -27,6 +27,8 @@ struct Application {
     shapes:Vec<Shape>,
     scale: f32,
 
+    instructions: Vec<Instruction>,
+
     is_mouse_down: bool,
     is_print_down: bool,
 }
@@ -38,6 +40,7 @@ impl Application {
             shapes: Vec::new(),
             is_mouse_down: false,
             is_print_down: false,
+            instructions: Vec::new(),
             scale,
         }
     }
@@ -233,10 +236,12 @@ fn main() {
     c.window_mode.width = 150_f32 * scale;
     c.window_mode.height = 100_f32 * scale;
 
-    load_font("Media/HersheySans1.svgfont");
+    let font = Font::load("Media/HersheySans1.svgfont");
 
     let mut application = Application::new(Vec2::new(150_f32,100_f32), scale);
     application.hex_grid();
+
+    font.print_in_instructions("Hello World *# 0123", &Vec2::new(32_f32, 32_f32), &2.0, &mut application.instructions);
 
     let (ctx, event_loop) = ContextBuilder::new("SVG Experiment", "AntonMakesGames")
     .default_conf(c)
