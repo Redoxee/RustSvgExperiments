@@ -12,6 +12,9 @@ use crate::utils::*;
 mod font;
 use crate::font::*;
 
+mod signature;
+use crate::signature::*;
+
 struct Shape {
     points:Vec<Vec2>,
 }
@@ -148,7 +151,17 @@ impl Application {
             .set("units", "mm")
             .add(path);
 
-        svg::save("image.svg", &document).unwrap();
+        let export_name = format!("Exports/AMG_{}.svg",get_signature_counter());
+
+        match svg::save(export_name, &document) {
+            Ok(_) => {
+                match increment_signature_counter() {
+                    Err(e) => panic!("{}", e),
+                    _=>()
+                }
+            }
+            Err(e)=> panic!("{}", e),
+        }
     }
 }
 
@@ -265,12 +278,13 @@ fn main() {
     c.window_mode.width = 150_f32 * scale;
     c.window_mode.height = 100_f32 * scale;
 
-    let font = Font::load("Media/HersheySans1.svgfont");
+    let font = Font::load("Medias/HersheySans1.svgfont");
 
     let mut application = Application::new(Vec2::new(150_f32,100_f32), scale);
     application.hex_grid();
 
-    font.print_in_instructions("Hello World *# 0123", Vec2::new(10_f32, 100_f32), 30.0, &mut application.instructions);
+    font.print_in_instructions(get_signature(), Vec2::new(10_f32, 100_f32), 30.0, &mut application.instructions);
+    
 
     let (ctx, event_loop) = ContextBuilder::new("SVG Experiment", "AntonMakesGames")
     .default_conf(c)

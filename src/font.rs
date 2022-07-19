@@ -117,10 +117,10 @@ impl Font {
         return font;
     }
 
-    pub fn print_in_instructions(&self, data : &str, position : Vec2, scale : f32, instructions : &mut Vec<Instruction>) {
+    pub fn print_in_instructions(&self, data : String, position : Vec2, scale : f32, instructions : &mut Vec<Instruction>) {
         let mut current_position = position;
         
-        for (_, char) in data.to_owned().chars().enumerate(){
+        for (_, char) in data.chars().enumerate(){
             let sigil = self.sigils.get(&char.to_string());
             match sigil {
                 Some(sigil) => {
