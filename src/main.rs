@@ -182,6 +182,33 @@ impl Application
             }
         }
     }
+
+    fn fill_mesh_builder(instructions : &Vec<Instruction>, mesh_builder : &mut MeshBuilder)
+    {
+        let line_width = 2_f32;
+        let mut vertices = Vec::new();
+        for instruction in instructions {
+            match instruction {
+                Instruction::LineTo(pos) => {
+                    vertices.push(pos.to_owned());
+                },
+                Instruction::MoveTo(pos) => {
+                    if vertices.len() > 0 {
+                        let pts = vertices.to_owned().into_iter().map(|p| mint::Point2{x: p.x, y: p.y}).collect::<Vec<mint::Point2<f32>>>();
+                        mesh_builder.line(&pts, line_width, graphics::Color::BLACK).unwrap();
+                    }
+
+                    vertices.clear();
+                    vertices.push(pos.to_owned());
+                }
+            }
+        }
+        
+        if vertices.len() > 0 {
+            let pts = vertices.to_owned().into_iter().map(|p| mint::Point2{x: p.x, y: p.y}).collect::<Vec<mint::Point2<f32>>>();
+            mesh_builder.line(&pts, line_width, graphics::Color::BLACK).unwrap();
+        }
+    }
 }
 
 impl ggez::event::EventHandler<GameError> for Application {
@@ -213,6 +240,8 @@ impl ggez::event::EventHandler<GameError> for Application {
         graphics::clear(ctx, graphics::Color::WHITE);
 
         let mb = &mut graphics::MeshBuilder::new();
+        
+        Application::fill_mesh_builder(&self.instructions, mb);
 
         if self.shapes.len() > 0 {
             for shape in &self.shapes {
@@ -241,7 +270,7 @@ fn main() {
     let mut application = Application::new(Vec2::new(150_f32,100_f32), scale);
     application.hex_grid();
 
-    font.print_in_instructions("Hello World *# 0123", &Vec2::new(32_f32, 32_f32), &2.0, &mut application.instructions);
+    font.print_in_instructions("Hello World *# 0123", Vec2::new(10_f32, 100_f32), 30.0, &mut application.instructions);
 
     let (ctx, event_loop) = ContextBuilder::new("SVG Experiment", "AntonMakesGames")
     .default_conf(c)

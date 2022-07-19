@@ -1,5 +1,4 @@
 use std::fs;
-use std::vec;
 use std::collections::HashMap;
 
 
@@ -7,7 +6,6 @@ use std::str::from_utf8;
 use glam::Vec2;
 use quick_xml::Reader;
 use quick_xml::events::Event;
-use quick_xml::events::attributes::{Attribute, AttrError};
 
 use crate::utils::Instruction;
 
@@ -24,7 +22,7 @@ impl Font {
 
     pub fn load(font_name: &str) -> Font {
         
-        let accepted_characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ?.-#".to_owned();
+        let accepted_characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ?.-#*".to_owned();
 
         let font_file_raw = fs::read_to_string(font_name)
             .expect("Something went wrong reading the font file");
@@ -33,11 +31,23 @@ impl Font {
         let mut font = Font{
             sigils: HashMap::new(),
         };
-
+        let mut font_scale = 1_f32;
         loop {
             match reader.read_event_unbuffered() {
                 Ok(Event::Empty(ref e)) => {
                     match e.name() {
+                        b"font-face" => {
+                            for attr in e.attributes() {
+                                let attr = attr.unwrap();
+                                let attr_value = from_utf8(&attr.value).unwrap().to_owned();
+                                match attr.key {
+                                    b"units-per-em" => {
+                                        font_scale = attr_value.parse::<f32>().unwrap();
+                                    },
+                                    _ => (),
+                                }
+                            }
+                        },
                         b"glyph" => {
                             let mut unicode = Option::None;
                             let mut width= Option::None;
@@ -71,8 +81,8 @@ impl Font {
                                         
                                         for split in splitted.chunks(3) {
                                             let operation = split[0];
-                                            let x = split[1].parse::<f32>().unwrap();
-                                            let y = split[2].parse::<f32>().unwrap();
+                                            let x = split[1].parse::<f32>().unwrap() / font_scale;
+                                            let y = split[2].parse::<f32>().unwrap() * -1_f32 / font_scale;
                                             let pos = Vec2::new(x, y);
                                             instructions.push(match operation {
                                                 "M" => {Instruction::MoveTo(pos)},
@@ -84,7 +94,7 @@ impl Font {
                                         font.sigils.insert(unicode,
                                             Sigil {
                                                 path : instructions,
-                                                width: width.parse::<f32>().unwrap(),
+                                                width: width.parse::<f32>().unwrap() / font_scale,
                                                 });
                                     }
                                 },
@@ -100,10 +110,35 @@ impl Font {
             }
         }
 
+        font.sigils.insert(" ".to_owned(), 
+            Sigil { path: Vec::new(), width: 300_f32 / font_scale},
+        );
+
         return font;
     }
 
-    pub fn print_in_instructions(&self, data : &str, position : &Vec2, scale : &f32, instructions : &mut Vec<Instruction>) {
+    pub fn print_in_instructions(&self, data : &str, position : Vec2, scale : f32, instructions : &mut Vec<Instruction>) {
+        let mut current_position = position;
+        
+        for (_, char) in data.to_owned().chars().enumerate(){
+            let sigil = self.sigils.get(&char.to_string());
+            match sigil {
+                Some(sigil) => {
+                    for instruction in &sigil.path {
+                        match instruction {
+                            Instruction::MoveTo(pos) => {
+                                instructions.push(Instruction::MoveTo(pos.to_owned() * scale + current_position));
+                            },
+                            Instruction::LineTo(pos) => {
+                                instructions.push(Instruction::LineTo(pos.to_owned() * scale + current_position));
+                            }
+                        }
+                    }
 
+                    current_position.x = current_position.x + sigil.width * scale;
+                },
+                None => { println!("Fond does not contains {}", char)}
+            }
+        }
     }
 }
