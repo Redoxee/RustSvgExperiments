@@ -117,6 +117,21 @@ impl Font {
         return font;
     }
 
+    pub fn get_width(&self, data: String, scale: f32) -> f32 {
+        let mut width = 0_f32;
+        for (_, char) in data.chars().enumerate(){
+            let sigil = self.sigils.get(&char.to_string());
+            match sigil {
+                Some(sigil) => {
+                    width = width + sigil.width;
+                },
+                None => { println!("Fond does not contains {}", char)}
+            }
+        }
+    
+        return width * scale;
+    }
+
     pub fn print_in_instructions(&self, data : String, position : Vec2, scale : f32, instructions : &mut Vec<Instruction>) {
         let mut current_position = position;
         

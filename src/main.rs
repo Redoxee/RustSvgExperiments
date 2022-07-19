@@ -275,16 +275,21 @@ impl ggez::event::EventHandler<GameError> for Application {
 fn main() {
     let scale = 5_f32;
     let mut c = conf::Conf::new();
-    c.window_mode.width = 150_f32 * scale;
-    c.window_mode.height = 100_f32 * scale;
+    let width = 150_f32;
+    let height = 100_f32;
+    c.window_mode.width = width * scale;
+    c.window_mode.height = height * scale;
 
     let font = Font::load("Medias/HersheySans1.svgfont");
 
-    let mut application = Application::new(Vec2::new(150_f32,100_f32), scale);
-    application.hex_grid();
-
-    font.print_in_instructions(get_signature(), Vec2::new(10_f32, 100_f32), 30.0, &mut application.instructions);
+    let mut application = Application::new(Vec2::new(width,height), scale);
     
+    let signature = get_signature();
+    let signature_height = 9.0_f32;
+    let signature_width = font.get_width(signature, signature_height);
+    font.print_in_instructions(get_signature(), Vec2::new(width * scale - signature_width- 3_f32, height* scale - 3_f32), signature_height, &mut application.instructions);
+    
+    application.hex_grid();
 
     let (ctx, event_loop) = ContextBuilder::new("SVG Experiment", "AntonMakesGames")
     .default_conf(c)
