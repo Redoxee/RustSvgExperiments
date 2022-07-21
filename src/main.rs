@@ -171,6 +171,7 @@ impl Application {
                     _=>()
                 }
             }
+            
             Err(e)=> panic!("{}", e),
         }
     }
