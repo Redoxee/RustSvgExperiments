@@ -138,6 +138,17 @@ impl Application {
             current_position = current_vertex;
         }
 
+        for instruction in &self.instructions {
+            match instruction {
+                Instruction::MoveTo(pos) => {
+                    data = data.move_to((*pos / self.scale).from());
+                },
+                Instruction::LineTo(pos) => {
+                    data = data.line_to((*pos / self.scale).from());
+                }
+            }
+        }
+
         let path = Path::new()
             .set("fill", "none")
             .set("stroke", "black")
