@@ -69,82 +69,94 @@ impl Application {
     }
 
     fn print_shapes(&self) {
-        if self.shapes.len() == 0 {
+        if self.shapes.len() == 0 && self.instructions.len() == 0 {
             return
         }
 
         let mut drawn_points = std::collections::HashSet::new();
         let mut data = Data::new();
 
-        let mut shapes_to_draw : Vec<usize> = (0..self.shapes.len()).collect();
-        let mut next_shape_index = (shapes_to_draw.len() - 1) / 2;
-        let mut start_vertex = 0 as usize;
-        let mut delta = 0;
+        if self.shapes.len() > 0 {
 
-        data = data.move_to((self.shapes[0].points[0] / self.scale).from());
-        let mut current_position = Vec2::default();
-        while !shapes_to_draw.is_empty() {
-            let shape_index = shapes_to_draw[next_shape_index];
-            shapes_to_draw.remove(next_shape_index);
-            let shape = &self.shapes[shape_index];
-            let mut current_vertex = shape.points[start_vertex];
-            if current_vertex != current_position {
-                data = data.move_to((current_vertex / self.scale).from());
-            }
-
-            for vert_index in 1..(shape.points.len() + 1) {
-                let next_vertex = shape.points[(vert_index + start_vertex) % shape.points.len()];
-                let pair = OrderedPair::new(current_vertex, next_vertex);
-                let next_point = (next_vertex / self.scale).from();
-                if !drawn_points.contains(&pair) {
-                    drawn_points.insert(pair);
-                    data = data.line_to(next_point);
-                }
-                else {
-                    data = data.move_to(next_point);
+            let mut shapes_to_draw : Vec<usize> = (0..self.shapes.len()).collect();
+            let mut next_shape_index = (shapes_to_draw.len() - 1) / 2;
+            let mut start_vertex = 0 as usize;
+            let mut delta = 0;
+            
+            data = data.move_to((self.shapes[0].points[0] / self.scale).from());
+            let mut current_position = Vec2::default();
+            while !shapes_to_draw.is_empty() {
+                let shape_index = shapes_to_draw[next_shape_index];
+                shapes_to_draw.remove(next_shape_index);
+                let shape = &self.shapes[shape_index];
+                let mut current_vertex = shape.points[start_vertex];
+                if current_vertex != current_position {
+                    data = data.move_to((current_vertex / self.scale).from());
                 }
 
-                current_vertex = next_vertex;
-            }
+                for vert_index in 1..(shape.points.len() + 1) {
+                    let next_vertex = shape.points[(vert_index + start_vertex) % shape.points.len()];
+                    let pair = OrderedPair::new(current_vertex, next_vertex);
+                    let next_point = (next_vertex / self.scale).from();
+                    if !drawn_points.contains(&pair) {
+                        drawn_points.insert(pair);
+                        data = data.line_to(next_point);
+                    }
+                    else {
+                        data = data.move_to(next_point);
+                    }
+                    
+                    current_vertex = next_vertex;
+                }
+                
+                if shapes_to_draw.is_empty() {
+                    break;
+                }
 
-            if shapes_to_draw.is_empty() {
-                break;
-            }
-
-            let mut found = false;
-            for other_index in 0..shapes_to_draw.len() {
-                let other_shape = &self.shapes[shapes_to_draw[other_index]];
-                for other_vertex_index in 0..other_shape.points.len() {
-                    let other_vertex = other_shape.points[other_vertex_index];
-                    if other_vertex == current_vertex {
-                        start_vertex = other_vertex_index;
-                        next_shape_index = other_index;
-                        found = true;
+                let mut found = false;
+                for other_index in 0..shapes_to_draw.len() {
+                    let other_shape = &self.shapes[shapes_to_draw[other_index]];
+                    for other_vertex_index in 0..other_shape.points.len() {
+                        let other_vertex = other_shape.points[other_vertex_index];
+                        if other_vertex == current_vertex {
+                            start_vertex = other_vertex_index;
+                            next_shape_index = other_index;
+                            found = true;
+                            break;
+                        }
+                    }
+                    
+                    if found {
                         break;
                     }
                 }
-
-                if found {
-                    break;
+                
+                if !found {
+                    next_shape_index = (shapes_to_draw.len() - 1) / 2;
+                    start_vertex = delta % self.shapes[shapes_to_draw[next_shape_index]].points.len();
+                    delta = delta + 1;
                 }
+                
+                current_position = current_vertex;
             }
-
-            if !found {
-                next_shape_index = (shapes_to_draw.len() - 1) / 2;
-                start_vertex = delta % self.shapes[shapes_to_draw[next_shape_index]].points.len();
-                delta = delta + 1;
-            }
-
-            current_position = current_vertex;
         }
 
+        let mut current_position = Vec2::new(0_f32, 0_f32);
         for instruction in &self.instructions {
             match instruction {
                 Instruction::MoveTo(pos) => {
                     data = data.move_to((*pos / self.scale).from());
+                    current_position = *pos;
                 },
                 Instruction::LineTo(pos) => {
-                    data = data.line_to((*pos / self.scale).from());
+                    
+                    let pair = OrderedPair::new(current_position, *pos);
+                    if !drawn_points.contains(&pair) {
+                        drawn_points.insert(pair);
+                        data = data.line_to((*pos / self.scale).from());
+                    }
+
+                    current_position = *pos;
                 }
             }
         }
@@ -272,12 +284,12 @@ impl ggez::event::EventHandler<GameError> for Application {
             for shape in &self.shapes {
                 shape.draw_mesh(mb);
             }
-            
-            let mesh = mb.build(ctx)?;
-            match graphics::draw(ctx, &mesh, graphics::DrawParam::new()) {
-                Ok(_) => (),
-                Err(e) => println!("ERROR : {:#?}", e)
-            }
+        }
+
+        let mesh = mb.build(ctx)?;
+        match graphics::draw(ctx, &mesh, graphics::DrawParam::new()) {
+            Ok(_) => (),
+            Err(e) => println!("ERROR : {:#?}", e)
         }
 
         graphics::present(ctx)
@@ -299,6 +311,7 @@ fn main() {
     let signature = get_signature();
     let signature_height = 9.0_f32;
     let signature_width = font.get_width(signature, signature_height);
+
     font.print_in_instructions(get_signature(), Vec2::new(width * scale - signature_width- 3_f32, height* scale - 3_f32), signature_height, &mut application.instructions);
     
     application.hex_grid();
