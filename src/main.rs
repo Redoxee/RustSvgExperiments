@@ -25,10 +25,76 @@ impl Shape {
     }
 }
 
+struct TileInfo {
+    position : Vec2,
+    neighbors : Vec<usize>,
+}
+
+impl TileInfo {
+    fn new(position : Vec2) -> TileInfo {
+        TileInfo {
+            position,
+            neighbors : Vec::new(),
+        }
+    }
+}
+
+struct Grid {
+    tiles : Vec<TileInfo>,
+}
+
+impl Grid {
+    fn HexGrid(col : usize, row : usize, tile_scale : f32, base_position : Vec2) -> Grid {
+        let mut grid = Grid {
+            tiles: Vec::new()
+        };
+
+        for y in 0..row {
+            for x in 0..col {
+                let mut position = base_position + Vec2::new(x as f32 * tile_scale, y as f32 * tile_scale);
+                if y % 2 == 1 {
+                    position.x = position.x + tile_scale / 2_f32;
+                }
+
+                let mut tile = TileInfo::new(position);
+                let tile_index = grid.tiles.len();
+
+                if x > 0 {
+                    tile.neighbors.push(tile_index - 1);
+                }
+                
+                if x < (col - 1) {
+                    tile.neighbors.push(tile_index + 1);                    
+                }
+
+                if y > 0 {
+                    if x > 0 {
+                        tile.neighbors.push(tile_index - col + (y + 1) % 2)
+                    }
+
+                    if x < (col - 1)
+                    {
+                        tile.neighbors.push(tile_index - col + (y + 1) % 2 + 1)
+                    }
+                }
+
+                grid.tiles.push(tile);
+            }
+        }
+
+        for tile_index in 0..grid.tiles.len() {
+            println!("{} : {:?}", tile_index, grid.tiles[tile_index].neighbors);
+        }
+
+        return grid;
+    }
+}
+
 struct Application {
     size: Vec2,
     shapes:Vec<Shape>,
     scale: f32,
+    font : Font,
 
     instructions: Vec<Instruction>,
 
@@ -37,7 +103,7 @@ struct Application {
 }
 
 impl Application {
-    fn new(size: Vec2, scale: f32) -> Application{
+    fn new(size: Vec2, scale: f32, font : Font) -> Application{
         Application {
             size,
             shapes: Vec::new(),
@@ -45,6 +111,7 @@ impl Application {
             is_print_down: false,
             instructions: Vec::new(),
             scale,
+            font,
         }
     }
 
@@ -193,8 +260,8 @@ impl Application
 {
     fn hex_grid(&mut self) {
         let hex_scale= 4_f32;
-        let grid_size = Vec2::new(20_f32, 4_f32);
-        let child_chance = 0.3;
+        let grid_size = Vec2::new(4_f32, 6_f32);
+        let child_chance = 0.0;
         let decay = 0.7;
 
         let hex_half_width = std::f32::consts::FRAC_PI_6.cos() * hex_scale * self.scale;
@@ -205,8 +272,9 @@ impl Application
         
         let mut random = rand::thread_rng();
 
-        for x in 0..(grid_size.x as usize) {
-            for y in 0..(grid_size.y as usize) {
+        let mut index = 0;
+        for y in 0..(grid_size.y as usize) {
+            for x in 0..(grid_size.x as usize) {
                 let fx = x as f32 * hex_width + (y % 2) as f32 * hex_half_width;
                 let fy = y as f32 * hex_height;
                 let mut child_scale = 1_f32;
@@ -216,6 +284,9 @@ impl Application
                     self.add_hexagone(Vec2::new(fx, fy) + base_position, hex_scale * child_scale);
                     child_scale = child_scale * decay;
                 }
+
+                self.font.print_in_instructions(format!("{}", index), Vec2::new(fx, fy) + base_position + Vec2::new(-7.5, 0.0), 15_f32, &mut self.instructions);
+                index = index + 1;
             }
         }
     }
@@ -306,14 +377,16 @@ fn main() {
 
     let font = Font::load("Medias/HersheySans1.svgfont");
 
-    let mut application = Application::new(Vec2::new(width,height), scale);
+    let mut application = Application::new(Vec2::new(width,height), scale, font);
     
     let signature = get_signature();
     let signature_height = 9.0_f32;
-    let signature_width = font.get_width(signature, signature_height);
+    let signature_width = application.font.get_width(signature, signature_height);
 
-    font.print_in_instructions(get_signature(), Vec2::new(width * scale - signature_width- 3_f32, height* scale - 3_f32), signature_height, &mut application.instructions);
-    
+    application.font.print_in_instructions(get_signature(), Vec2::new(width * scale - signature_width- 3_f32, height* scale - 3_f32), signature_height, &mut application.instructions);
+
+    let grid = Grid::HexGrid(4, 4, 10_f32, Vec2::new(0_f32, 0_f32));
+
     application.hex_grid();
 
     let (ctx, event_loop) = ContextBuilder::new("SVG Experiment", "AntonMakesGames")
