@@ -44,10 +44,13 @@ struct Grid {
 }
 
 impl Grid {
-    fn HexGrid(col : usize, row : usize, tile_scale : f32, base_position : Vec2) -> Grid {
+    fn hex_grid(col : usize, row : usize, tile_scale : f32, base_position : Vec2) -> Grid {
         let mut grid = Grid {
             tiles: Vec::new()
         };
+
+        let max_x = col - 1;
+        let max_y = row - 1;
 
         for y in 0..row {
             for x in 0..col {
@@ -63,21 +66,46 @@ impl Grid {
                     tile.neighbors.push(tile_index - 1);
                 }
                 
-                if x < (col - 1) {
-                    tile.neighbors.push(tile_index + 1);                    
+                if x < max_x {
+                    tile.neighbors.push(tile_index + 1);
                 }
 
-                if y > 0 {
-                    if x > 0 {
-                        tile.neighbors.push(tile_index - col + (y + 1) % 2)
+                if y % 2 == 0 {
+                    if y > 0 {
+                        tile.neighbors.push(tile_index - col);
+
+                        if x > 0 {
+                            tile.neighbors.push(tile_index - col - 1);
+                        }
                     }
 
-                    if x < (col - 1)
-                    {
-                        tile.neighbors.push(tile_index - col + (y + 1) % 2 + 1)
+                    if y < max_y {
+                        tile.neighbors.push(tile_index + col);
+
+                        if x > 0 {
+                            tile.neighbors.push(tile_index + col - 1);
+                        }
+                    }
+                }
+                else {
+                    if y > 0 {
+                        tile.neighbors.push(tile_index - col);
+
+                        if x < max_x {
+                            tile.neighbors.push(tile_index - col + 1);
+                        }
+                    }
+
+                    if y < max_y {
+                        tile.neighbors.push(tile_index + col);
+
+                        if x < max_x {
+                            tile.neighbors.push(tile_index + col + 1);
+                        }
                     }
                 }
 
+                
                 grid.tiles.push(tile);
             }
         }
@@ -260,7 +288,7 @@ impl Application
 {
     fn hex_grid(&mut self) {
         let hex_scale= 4_f32;
-        let grid_size = Vec2::new(4_f32, 6_f32);
+        let grid_size = Vec2::new(4_f32, 4_f32);
         let child_chance = 0.0;
         let decay = 0.7;
 
@@ -385,7 +413,7 @@ fn main() {
 
     application.font.print_in_instructions(get_signature(), Vec2::new(width * scale - signature_width- 3_f32, height* scale - 3_f32), signature_height, &mut application.instructions);
 
-    let grid = Grid::HexGrid(4, 4, 10_f32, Vec2::new(0_f32, 0_f32));
+    let grid = Grid::hex_grid(4, 4, 10_f32, Vec2::new(0_f32, 0_f32));
 
     application.hex_grid();
 
