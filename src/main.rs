@@ -15,15 +15,19 @@ use crate::font::*;
 mod signature;
 use crate::signature::*;
 
+use std::collections::HashSet;
+
 struct TileInfo {
+    index : usize,
     position : Vec2,
     neighbors : Vec<usize>,
     vertices : Vec<Vec2>,
 }
 
 impl TileInfo {
-    fn new(position : Vec2) -> TileInfo {
+    fn new(index: usize, position : Vec2) -> TileInfo {
         TileInfo {
+            index,
             position,
             neighbors : Vec::new(),
             vertices : Vec::new(),
@@ -63,8 +67,8 @@ impl Grid {
                     position.x = position.x + co;
                 }
 
-                let mut tile = TileInfo::new(position);
                 let tile_index = grid.tiles.len();
+                let mut tile = TileInfo::new(tile_index, position);
 
                 if x > 0 {
                     tile.neighbors.push(tile_index - 1);
@@ -123,6 +127,45 @@ impl Grid {
 
         return grid;
     }
+
+    fn random_walk(&self, instructions : &mut Vec<Instruction>) {
+        let mut random = rand::thread_rng();
+        let mut used_indexes = HashSet::new();
+        let mut unused_indexes: Vec<usize> = (0..self.tiles.len()).collect();
+        let mut tile_remaining = self.tiles.len();
+
+        let mut current_index = random.gen_range(0..self.tiles.len());
+
+        instructions.push(Instruction::MoveTo(self.tiles[current_index].position));
+
+        let frame = 100;
+        let mut counter = frame;
+
+        while tile_remaining > 0 {
+            used_indexes.insert(current_index);
+            unused_indexes.swap_remove(unused_indexes.iter().position(|&i| i == current_index).unwrap());
+            tile_remaining = tile_remaining - 1;
+
+            let valid_neighbors : Vec<&usize> = self.tiles[current_index].neighbors.iter().filter(|&it| !used_indexes.contains(it)).collect();
+            if valid_neighbors.len() > 0 {
+                let neighbor_index = *valid_neighbors[random.gen_range(0..valid_neighbors.len())];
+                current_index = self.tiles[neighbor_index].index;
+                
+                instructions.push(Instruction::LineTo(self.tiles[current_index].position));
+            }
+            else if tile_remaining > 0 {
+                current_index = unused_indexes[random.gen_range(0..unused_indexes.len())];
+                
+                instructions.push(Instruction::MoveTo(self.tiles[current_index].position));
+            }
+
+            counter = counter - 1;
+            if counter < 1 {
+                counter = frame;
+                println!("{} : {} / {}", tile_remaining as f32 / self.tiles.len() as f32, tile_remaining, self.tiles.len());
+            }
+        }
+    }
 }
 
 struct Application {
@@ -151,9 +194,10 @@ impl Application {
     }
 
     fn print_to_svg(&self) {
-        let mut drawn_points = std::collections::HashSet::new();
+        let mut drawn_points : HashSet<OrderedPair> = std::collections::HashSet::new();
         let mut data = Data::new();
 
+        /*
         {
             let mut shapes_to_draw : Vec<usize> = (0..self.grid.tiles.len()).collect();
             let mut next_shape_index = (shapes_to_draw.len() - 1) / 2;
@@ -217,6 +261,8 @@ impl Application {
                 current_position = current_vertex;
             }
         }
+    */
+
         let mut current_position = Vec2::new(0_f32, 0_f32);
         for instruction in &self.instructions {
             match instruction {
@@ -278,7 +324,7 @@ impl Application
                     vertices.push(pos.to_owned());
                 },
                 Instruction::MoveTo(pos) => {
-                    if vertices.len() > 0 {
+                    if vertices.len() > 1 {
                         let pts = vertices.to_owned().into_iter().map(|p| mint::Point2{x: p.x, y: p.y}).collect::<Vec<mint::Point2<f32>>>();
                         mesh_builder.line(&pts, line_width, graphics::Color::BLACK).unwrap();
                     }
@@ -326,15 +372,11 @@ impl ggez::event::EventHandler<GameError> for Application {
         let mb = &mut graphics::MeshBuilder::new();
         
         Application::fill_mesh_builder(&self.instructions, mb);
-
+/*
         for tile in &self.grid.tiles {
             mb.polygon(graphics::DrawMode::Stroke(graphics::StrokeOptions::default().with_line_width(2_f32)), &tile.vertices, graphics::Color::BLACK).unwrap();
-        
-            for neighbor in &tile.neighbors {
-                mb.line(&[tile.position, self.grid.tiles[*neighbor].position], 3_f32, graphics::Color::BLACK).unwrap();
-            }
         }
-
+*/
         let mesh = mb.build(ctx)?;
         match graphics::draw(ctx, &mesh, graphics::DrawParam::new()) {
             Ok(_) => (),
@@ -355,12 +397,14 @@ fn main() {
 
     let font = Font::load("Medias/HersheySans1.svgfont");
     
-    let col = 40;
+    let col = 100;
     let row = 40;
-    let tile_scale = 8_f32;
+    let tile_scale = 4_f32;
     let grid_size = Grid::hex_grid_size(col, row, tile_scale);
     let grid = Grid::hex_grid(col, row, tile_scale, Vec2::new((width * scale - grid_size.x) / 2_f32, (height * scale - grid_size.y) / 2_f32));
     let mut application = Application::new(grid, scale, Vec2::new(width, height), font);
+
+    application.grid.random_walk(&mut application.instructions);
     
     let signature = get_signature();
     let signature_height = 9.0_f32;
