@@ -15,6 +15,7 @@ use crate::font::*;
 mod signature;
 use crate::signature::*;
 
+use std::cmp::Ordering;
 use std::collections::HashSet;
 
 struct TileInfo {
@@ -171,13 +172,42 @@ impl Grid {
             counter = counter - 1;
             if counter < 1 {
                 counter = frame;
-                println!("{} : {} / {}", tile_remaining as f32 / self.tiles.len() as f32, tile_remaining, self.tiles.len());
+                println!("{:.3} : {} / {}", tile_remaining as f32 / self.tiles.len() as f32, tile_remaining, self.tiles.len());
             }
         }
 
         walks.push(current_walk);
-
-        walks.sort_by(|a ,b| a.len().cmp(&b.len()));
+        walks.sort_by(|a ,b| {
+            let cmp = a.len().cmp(&b.len());
+            match cmp {
+                Ordering::Equal => {
+                    let delta = b[0].x - a[0].x;
+                    if delta < -std::f32::MIN_POSITIVE {
+                        Ordering::Greater
+                    }
+                    else if delta > std::f32::MIN_POSITIVE {
+                        Ordering::Less
+                    }
+                    else
+                    {
+                        let delta = b[0].y - a[0].y;
+                        if delta < -std::f32::MIN_POSITIVE {
+                            Ordering::Greater
+                        }
+                        else if delta > std::f32::MIN_POSITIVE {
+                            Ordering::Less
+                        }
+                        else {
+                            Ordering::Equal
+                        }
+                    }
+                    
+                },
+                _other =>{
+                    cmp
+                }
+            }
+        });
 
         for walk in walks {
             if walk.len() < 1 {
@@ -465,8 +495,8 @@ fn main() {
 
     let font = Font::load("Medias/HersheySans1.svgfont");
     
-    let col = 100;
-    let row = 40;
+    let col = 80;
+    let row = 70;
     let tile_scale = 4_f32;
     let grid_size = Grid::hex_grid_size(col, row, tile_scale);
     let grid = Grid::hex_grid(col, row, tile_scale, Vec2::new((width * scale - grid_size.x) / 2_f32, (height * scale - grid_size.y) / 2_f32));
