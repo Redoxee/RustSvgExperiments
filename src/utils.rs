@@ -57,3 +57,19 @@ impl Instruction {
         }
     }
 }
+
+pub fn print_circle_to_instructions(position : Vec2, radius : f32, nb_vertice: i32, instructions : &mut Vec<Instruction>) {
+    let co = (std::f32::consts::TAU / nb_vertice as f32).cos();
+    let si = (std::f32::consts::TAU / nb_vertice as f32).sin();
+    let mut x = 0_f32;
+    let mut y = 1_f32;
+    instructions.push(Instruction::MoveTo(position + Vec2::new(x, y) * radius));
+    for _ in 0..nb_vertice {
+        let nx = x * co - y * si;
+        let ny = x * si + y * co;
+        
+        x = nx;
+        y = ny;
+        instructions.push(Instruction::LineTo(position + Vec2::new(x, y) * radius));
+    }
+}

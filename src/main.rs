@@ -37,6 +37,7 @@ impl TileInfo {
 
 struct Grid {
     tiles : Vec<TileInfo>,
+    tile_scale : f32,
 }
 
 impl Grid {
@@ -46,7 +47,8 @@ impl Grid {
 
     fn hex_grid(col : usize, row : usize, tile_scale : f32, base_position : Vec2) -> Grid {
         let mut grid = Grid {
-            tiles: Vec::new()
+            tiles: Vec::new(),
+            tile_scale,
         };
 
         let max_x = col - 1;
@@ -128,7 +130,7 @@ impl Grid {
         return grid;
     }
 
-    fn random_walk(&self, instructions : &mut Vec<Instruction>) {
+    fn random_walk(&self, instructions: &mut Vec<Instruction>) {
         let mut random = rand::thread_rng();
         let mut used_indexes = HashSet::new();
         let mut unused_indexes: Vec<usize> = (0..self.tiles.len()).collect();
@@ -141,6 +143,11 @@ impl Grid {
         let frame = 100;
         let mut counter = frame;
 
+        let mut walks = Vec::new();
+        let mut current_walk = Vec::new();
+
+        current_walk.push(self.tiles[current_index].position);
+
         while tile_remaining > 0 {
             used_indexes.insert(current_index);
             unused_indexes.swap_remove(unused_indexes.iter().position(|&i| i == current_index).unwrap());
@@ -151,18 +158,41 @@ impl Grid {
                 let neighbor_index = *valid_neighbors[random.gen_range(0..valid_neighbors.len())];
                 current_index = self.tiles[neighbor_index].index;
                 
-                instructions.push(Instruction::LineTo(self.tiles[current_index].position));
+                current_walk.push(self.tiles[current_index].position);
             }
             else if tile_remaining > 0 {
                 current_index = unused_indexes[random.gen_range(0..unused_indexes.len())];
                 
-                instructions.push(Instruction::MoveTo(self.tiles[current_index].position));
+                walks.push(current_walk);
+                current_walk = Vec::new();
+                current_walk.push(self.tiles[current_index].position);
             }
 
             counter = counter - 1;
             if counter < 1 {
                 counter = frame;
                 println!("{} : {} / {}", tile_remaining as f32 / self.tiles.len() as f32, tile_remaining, self.tiles.len());
+            }
+        }
+
+        walks.push(current_walk);
+
+        walks.sort_by(|a ,b| a.len().cmp(&b.len()));
+
+        for walk in walks {
+            if walk.len() < 1 {
+                continue;
+            }
+
+            if walk.len() < 2 {
+                print_circle_to_instructions(walk[0], self.tile_scale / 2_f32, 8, instructions);
+
+                continue;
+            }
+
+            instructions.push(Instruction::MoveTo(walk[0]));
+            for index in 1..walk.len() {
+                instructions.push(Instruction::LineTo(walk[index]));
             }
         }
     }
@@ -178,6 +208,8 @@ struct Application {
 
     is_mouse_down: bool,
     is_print_down: bool,
+
+    animation_frame: i32,
 }
 
 impl Application {
@@ -190,6 +222,7 @@ impl Application {
             scale,
             font,
             size,
+            animation_frame: 0,
         }
     }
 
@@ -313,20 +346,23 @@ impl Application {
 
 impl Application
 {
-    fn fill_mesh_builder(instructions : &Vec<Instruction>, mesh_builder : &mut MeshBuilder)
-    {
+    fn fill_mesh_builder(instructions : &Vec<Instruction>, max_segment_points: i32, mesh_builder : &mut MeshBuilder) -> bool {
         let line_width = 2_f32;
         let mut vertices = Vec::new();
+        let mut has_filled_mesh_builder = false;
 
         for instruction in instructions {
             match instruction {
                 Instruction::LineTo(pos) => {
-                    vertices.push(pos.to_owned());
+                    if max_segment_points < 0 || vertices.len() < max_segment_points as usize {
+                        vertices.push(pos.to_owned());
+                    }
                 },
                 Instruction::MoveTo(pos) => {
                     if vertices.len() > 1 {
                         let pts = vertices.to_owned().into_iter().map(|p| mint::Point2{x: p.x, y: p.y}).collect::<Vec<mint::Point2<f32>>>();
                         mesh_builder.line(&pts, line_width, graphics::Color::BLACK).unwrap();
+                        has_filled_mesh_builder = true;
                     }
 
                     vertices.clear();
@@ -335,10 +371,25 @@ impl Application
             }
         }
         
-        if vertices.len() > 0 {
+        if vertices.len() > 1 {
             let pts = vertices.to_owned().into_iter().map(|p| mint::Point2{x: p.x, y: p.y}).collect::<Vec<mint::Point2<f32>>>();
             mesh_builder.line(&pts, line_width, graphics::Color::BLACK).unwrap();
+            has_filled_mesh_builder = true;
         }
+
+        return has_filled_mesh_builder;
+    }
+
+    fn random_walk_into_instrution(&mut self) {
+        self.grid.random_walk(&mut self.instructions);
+    }
+
+    fn sign_into_instructions(&mut self) {
+        let signature = get_signature();
+        let signature_height = 9.0_f32;
+        let signature_width = self.font.get_width(signature, signature_height);
+        let signature_margine = 15_f32;
+        self.font.print_in_instructions(get_signature(), Vec2::new(self.size.x * self.scale - signature_width - signature_margine, self.size.y * self.scale - 3_f32), signature_height, &mut self.instructions);
     }
 }
 
@@ -352,7 +403,10 @@ impl ggez::event::EventHandler<GameError> for Application {
         self.is_mouse_down = input::mouse::button_pressed(ctx, event::MouseButton::Left);
         if was_pressed != self.is_mouse_down {
             if self.is_mouse_down {
-                
+                self.instructions.clear();
+                self.animation_frame = 0;
+                self.random_walk_into_instrution();
+                self.sign_into_instructions();
             }
         }
 
@@ -369,18 +423,24 @@ impl ggez::event::EventHandler<GameError> for Application {
     fn draw(&mut self, ctx: &mut Context) -> Result<(), GameError> {
         graphics::clear(ctx, graphics::Color::WHITE);
 
+        self.animation_frame = self.animation_frame + 1;
+
         let mb = &mut graphics::MeshBuilder::new();
         
-        Application::fill_mesh_builder(&self.instructions, mb);
-/*
+        let has_filled_mesh_builder = Application::fill_mesh_builder(&self.instructions, self.animation_frame / 4, mb);
+
+        /*
         for tile in &self.grid.tiles {
             mb.polygon(graphics::DrawMode::Stroke(graphics::StrokeOptions::default().with_line_width(2_f32)), &tile.vertices, graphics::Color::BLACK).unwrap();
         }
-*/
-        let mesh = mb.build(ctx)?;
-        match graphics::draw(ctx, &mesh, graphics::DrawParam::new()) {
-            Ok(_) => (),
-            Err(e) => println!("ERROR : {:#?}", e)
+        */
+        
+        if has_filled_mesh_builder {
+            let mesh = mb.build(ctx)?;
+            match graphics::draw(ctx, &mesh, graphics::DrawParam::new()) {
+                Ok(_) => (),
+                Err(e) => println!("ERROR : {:#?}", e)
+            }
         }
 
         graphics::present(ctx)
@@ -404,14 +464,9 @@ fn main() {
     let grid = Grid::hex_grid(col, row, tile_scale, Vec2::new((width * scale - grid_size.x) / 2_f32, (height * scale - grid_size.y) / 2_f32));
     let mut application = Application::new(grid, scale, Vec2::new(width, height), font);
 
-    application.grid.random_walk(&mut application.instructions);
+    application.random_walk_into_instrution();
+    application.sign_into_instructions();
     
-    let signature = get_signature();
-    let signature_height = 9.0_f32;
-    let signature_width = application.font.get_width(signature, signature_height);
-
-    application.font.print_in_instructions(get_signature(), Vec2::new(width * scale - signature_width- 3_f32, height* scale - 3_f32), signature_height, &mut application.instructions);
-
     let (ctx, event_loop) = ContextBuilder::new("SVG Experiment", "AntonMakesGames")
     .default_conf(c)
     .window_setup(conf::WindowSetup{
