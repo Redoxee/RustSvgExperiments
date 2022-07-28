@@ -185,10 +185,12 @@ impl Grid {
             }
 
             if walk.len() < 2 {
-                print_circle_to_instructions(walk[0], self.tile_scale / 2_f32, 8, instructions);
+                // print_circle_to_instructions(walk[0], self.tile_scale / 2_f32, 8, instructions);
 
                 continue;
             }
+
+            let walk = smooth(walk, 4, 0.15_f32);
 
             instructions.push(Instruction::MoveTo(walk[0]));
             for index in 1..walk.len() {
@@ -410,6 +412,10 @@ impl ggez::event::EventHandler<GameError> for Application {
             }
         }
 
+        if input::keyboard::is_key_pressed(ctx, input::keyboard::KeyCode::S) {
+            self.animation_frame = -20;
+        }
+
         let was_down = self.is_print_down;
         self.is_print_down = input::keyboard::is_key_pressed(ctx, input::keyboard::KeyCode::P);
         if was_down != self.is_print_down && self.is_print_down
@@ -423,7 +429,9 @@ impl ggez::event::EventHandler<GameError> for Application {
     fn draw(&mut self, ctx: &mut Context) -> Result<(), GameError> {
         graphics::clear(ctx, graphics::Color::WHITE);
 
-        self.animation_frame = self.animation_frame + 1;
+        if self.animation_frame > -1 {
+            self.animation_frame = self.animation_frame + 1;
+        }
 
         let mb = &mut graphics::MeshBuilder::new();
         

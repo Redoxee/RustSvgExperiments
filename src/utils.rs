@@ -73,3 +73,38 @@ pub fn print_circle_to_instructions(position : Vec2, radius : f32, nb_vertice: i
         instructions.push(Instruction::LineTo(position + Vec2::new(x, y) * radius));
     }
 }
+
+pub fn smooth(positions : Vec<Vec2>, nb_points: usize, sharpness: f32) -> Vec<Vec2> {
+    let mut smoothed = Vec::new();
+    if positions.len() < 2 {
+        return positions;
+    }
+    
+    smoothed.push(positions[0]);
+    
+    for index in 1..(positions.len() - 1) {
+        let p1 = positions[index - 1];
+        let p2 = positions[index];
+        let p3 = positions[index + 1];
+
+        let p1 = (p1 + p2) / 2_f32;
+        let p3 = (p3 + p2) / 2_f32;
+        let p1 = p1 + (p2 - p1) * sharpness;
+        let p3 = p3 + (p2 - p3) * sharpness;
+
+        let dp12 = p2 - p1;
+        let dp23 = p3 - p2;
+
+        for pt in 0..nb_points {
+            let s = pt as f32 / nb_points as f32;
+            let l1 = p1 + dp12 * s;
+            let l2 = p2 + dp23 * s;
+            
+            smoothed.push(l1 + (l2 - l1) * s);
+        }
+    }
+
+    smoothed.push(positions[positions.len() - 1]);
+    
+    return smoothed;
+}
