@@ -1,7 +1,6 @@
 use ggez::{*, graphics::MeshBuilder};
 use glam::*;
 
-use rand::Rng;
 use svg::Document;
 use svg::node::element::Path;
 use svg::node::element::path::Data;
@@ -15,226 +14,19 @@ use crate::font::*;
 mod signature;
 use crate::signature::*;
 
+mod grid;
+use crate::grid::*;
+
 use std::cmp::Ordering;
 use std::collections::HashSet;
-
-struct TileInfo {
-    index : usize,
-    position : Vec2,
-    neighbors : Vec<usize>,
-    vertices : Vec<Vec2>,
-}
-
-impl TileInfo {
-    fn new(index: usize, position : Vec2) -> TileInfo {
-        TileInfo {
-            index,
-            position,
-            neighbors : Vec::new(),
-            vertices : Vec::new(),
-        }
-    }
-}
-
-struct Grid {
-    tiles : Vec<TileInfo>,
-    tile_scale : f32,
-}
-
-impl Grid {
-    fn hex_grid_size(col : usize, row : usize, tile_scale : f32) -> Vec2{
-        Vec2::new(col as f32 * tile_scale * 2_f32 * std::f32::consts::FRAC_PI_6.cos(), row as f32 * tile_scale * 3_f32 * std::f32::consts::FRAC_PI_6.sin())   
-    }
-
-    fn hex_grid(col : usize, row : usize, tile_scale : f32, base_position : Vec2) -> Grid {
-        let mut grid = Grid {
-            tiles: Vec::new(),
-            tile_scale,
-        };
-
-        let max_x = col - 1;
-        let max_y = row - 1;
-
-        let o = 0_f32;
-        let i = 1_f32 * tile_scale;
-        let si = std::f32::consts::FRAC_PI_6.sin() * tile_scale;
-        let co = std::f32::consts::FRAC_PI_6.cos() * tile_scale;
-
-        let tile_width = co * 2_f32;
-        let tile_height = si * 3_f32;
-
-        for y in 0..row {
-            for x in 0..col {
-                let mut position = base_position + Vec2::new(x as f32 * tile_width, y as f32 * tile_height);
-                if y % 2 == 1 {
-                    position.x = position.x + co;
-                }
-
-                let tile_index = grid.tiles.len();
-                let mut tile = TileInfo::new(tile_index, position);
-
-                if x > 0 {
-                    tile.neighbors.push(tile_index - 1);
-                }
-                
-                if x < max_x {
-                    tile.neighbors.push(tile_index + 1);
-                }
-
-                if y % 2 == 0 {
-                    if y > 0 {
-                        tile.neighbors.push(tile_index - col);
-
-                        if x > 0 {
-                            tile.neighbors.push(tile_index - col - 1);
-                        }
-                    }
-
-                    if y < max_y {
-                        tile.neighbors.push(tile_index + col);
-
-                        if x > 0 {
-                            tile.neighbors.push(tile_index + col - 1);
-                        }
-                    }
-                }
-                else {
-                    if y > 0 {
-                        tile.neighbors.push(tile_index - col);
-
-                        if x < max_x {
-                            tile.neighbors.push(tile_index - col + 1);
-                        }
-                    }
-
-                    if y < max_y {
-                        tile.neighbors.push(tile_index + col);
-
-                        if x < max_x {
-                            tile.neighbors.push(tile_index + col + 1);
-                        }
-                    }
-                }
-                
-                tile.vertices.clear();
-                tile.vertices.push(position + Vec2::new(o, i));
-                tile.vertices.push(position + Vec2::new(-co, si));
-                tile.vertices.push(position + Vec2::new(-co, -si));
-                tile.vertices.push(position + Vec2::new(o, -i));
-                tile.vertices.push(position + Vec2::new(co, -si));
-                tile.vertices.push(position + Vec2::new(co, si));
-                
-                grid.tiles.push(tile);
-            }
-        }
-
-        return grid;
-    }
-
-    fn random_walk(&self, instructions: &mut Vec<Instruction>) {
-        let mut random = rand::thread_rng();
-        let mut used_indexes = HashSet::new();
-        let mut unused_indexes: Vec<usize> = (0..self.tiles.len()).collect();
-        let mut tile_remaining = self.tiles.len();
-
-        let mut current_index = random.gen_range(0..self.tiles.len());
-
-        instructions.push(Instruction::MoveTo(self.tiles[current_index].position));
-
-        let frame = 100;
-        let mut counter = frame;
-
-        let mut walks = Vec::new();
-        let mut current_walk = Vec::new();
-
-        current_walk.push(self.tiles[current_index].position);
-
-        while tile_remaining > 0 {
-            used_indexes.insert(current_index);
-            unused_indexes.swap_remove(unused_indexes.iter().position(|&i| i == current_index).unwrap());
-            tile_remaining = tile_remaining - 1;
-
-            let valid_neighbors : Vec<&usize> = self.tiles[current_index].neighbors.iter().filter(|&it| !used_indexes.contains(it)).collect();
-            if valid_neighbors.len() > 0 {
-                let neighbor_index = *valid_neighbors[random.gen_range(0..valid_neighbors.len())];
-                current_index = self.tiles[neighbor_index].index;
-                
-                current_walk.push(self.tiles[current_index].position);
-            }
-            else if tile_remaining > 0 {
-                current_index = unused_indexes[random.gen_range(0..unused_indexes.len())];
-                
-                walks.push(current_walk);
-                current_walk = Vec::new();
-                current_walk.push(self.tiles[current_index].position);
-            }
-
-            counter = counter - 1;
-            if counter < 1 {
-                counter = frame;
-                println!("{:.3} : {} / {}", tile_remaining as f32 / self.tiles.len() as f32, tile_remaining, self.tiles.len());
-            }
-        }
-
-        walks.push(current_walk);
-        walks.sort_by(|a ,b| {
-            let cmp = a.len().cmp(&b.len());
-            match cmp {
-                Ordering::Equal => {
-                    let delta = b[0].x - a[0].x;
-                    if delta < -std::f32::MIN_POSITIVE {
-                        Ordering::Greater
-                    }
-                    else if delta > std::f32::MIN_POSITIVE {
-                        Ordering::Less
-                    }
-                    else
-                    {
-                        let delta = b[0].y - a[0].y;
-                        if delta < -std::f32::MIN_POSITIVE {
-                            Ordering::Greater
-                        }
-                        else if delta > std::f32::MIN_POSITIVE {
-                            Ordering::Less
-                        }
-                        else {
-                            Ordering::Equal
-                        }
-                    }
-                    
-                },
-                _other =>{
-                    cmp
-                }
-            }
-        });
-
-        for walk in walks {
-            if walk.len() < 1 {
-                continue;
-            }
-
-            if walk.len() < 2 {
-                // print_circle_to_instructions(walk[0], self.tile_scale / 2_f32, 8, instructions);
-
-                continue;
-            }
-
-            let walk = smooth(walk, 4, 0.15_f32);
-
-            instructions.push(Instruction::MoveTo(walk[0]));
-            for index in 1..walk.len() {
-                instructions.push(Instruction::LineTo(walk[index]));
-            }
-        }
-    }
-}
 
 struct Application {
     grid: Grid,
     scale: f32,
     size: Vec2,
     font : Font,
+
+    walk_parameters : RandomWalkParameters,
 
     instructions: Vec<Instruction>,
 
@@ -245,7 +37,7 @@ struct Application {
 }
 
 impl Application {
-    fn new(grid: Grid, scale: f32, size: Vec2, font : Font) -> Application{
+    fn new(grid: Grid, scale: f32, size: Vec2, font : Font, walk_parameters : RandomWalkParameters) -> Application{
         Application {
             grid,
             is_mouse_down: false,
@@ -254,6 +46,7 @@ impl Application {
             scale,
             font,
             size,
+            walk_parameters,
             animation_frame: 0,
         }
     }
@@ -413,7 +206,7 @@ impl Application
     }
 
     fn random_walk_into_instrution(&mut self) {
-        self.grid.random_walk(&mut self.instructions);
+        self.grid.random_walk(self.walk_parameters, &mut self.instructions);
     }
 
     fn sign_into_instructions(&mut self) {
@@ -495,12 +288,19 @@ fn main() {
 
     let font = Font::load("Medias/HersheySans1.svgfont");
     
-    let col = 80;
-    let row = 70;
-    let tile_scale = 4_f32;
+    let col = 10;
+    let row = 10;
+    let tile_scale = 12_f32;
     let grid_size = Grid::hex_grid_size(col, row, tile_scale);
     let grid = Grid::hex_grid(col, row, tile_scale, Vec2::new((width * scale - grid_size.x) / 2_f32, (height * scale - grid_size.y) / 2_f32));
-    let mut application = Application::new(grid, scale, Vec2::new(width, height), font);
+
+    let walk_parameters = RandomWalkParameters {
+        slice_percentage: 0.5_f32,
+        smooth_number_of_points: 4,
+        smooth_sharpness: 0.9_f32,
+    };
+
+    let mut application = Application::new(grid, scale, Vec2::new(width, height), font, walk_parameters);
 
     application.random_walk_into_instrution();
     application.sign_into_instructions();
