@@ -30,13 +30,18 @@ fn main() {
     let grid_size = Grid::hex_grid_size(col, row, tile_scale);
     let grid = Grid::hex_grid(col, row, tile_scale, Vec2::new((width * scale - grid_size.x) / 2_f32, (height * scale - grid_size.y) / 2_f32));
 
-    let walk_parameters = RandomWalkParameters {
-        slice_percentage: 0.5_f32,
-        smooth_number_of_points: 4,
-        smooth_sharpness: 0.9_f32,
+    let parameters = ApplicationParameters{
+        animate_instructions: false,
+        display_grid: false,
+        print_grid: false,
+        walk_parameters: RandomWalkParameters {
+            slice_percentage: 0.5_f32,
+            smooth_number_of_points: 4,
+            smooth_sharpness: 0.9_f32,
+        },
     };
 
-    let mut application = Application::new(grid, scale, Vec2::new(width, height), font, walk_parameters);
+    let mut application = Application::new(grid, scale, Vec2::new(width, height), font, parameters);
 
     application.random_walk_into_instrution();
     application.sign_into_instructions();

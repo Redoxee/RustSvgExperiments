@@ -11,24 +11,32 @@ use crate::signature::*;
 use crate::grid::*;
 use std::collections::HashSet;
 
+#[derive(Copy, Clone)]
+pub struct ApplicationParameters {
+    pub display_grid : bool,
+    pub print_grid : bool,
+    pub animate_instructions : bool,
+    pub walk_parameters : RandomWalkParameters,
+}
+
 pub struct Application {
     grid: Grid,
     scale: f32,
     size: Vec2,
     font : Font,
 
-    walk_parameters : RandomWalkParameters,
+    parameters : ApplicationParameters,
 
     instructions: Vec<Instruction>,
 
     is_mouse_down: bool,
     is_print_down: bool,
-
+    
     animation_frame: i32,
 }
 
 impl Application {
-    pub fn new(grid: Grid, scale: f32, size: Vec2, font : Font, walk_parameters : RandomWalkParameters) -> Application{
+    pub fn new(grid: Grid, scale: f32, size: Vec2, font : Font, parameters : ApplicationParameters) -> Application{
         Application {
             grid,
             is_mouse_down: false,
@@ -37,8 +45,8 @@ impl Application {
             scale,
             font,
             size,
-            walk_parameters,
-            animation_frame: 0,
+            parameters,
+            animation_frame: match parameters.animate_instructions { true => 0, false => -20},
         }
     }
 
@@ -46,8 +54,7 @@ impl Application {
         let mut drawn_points : HashSet<OrderedPair> = std::collections::HashSet::new();
         let mut data = Data::new();
 
-        /*
-        {
+        if self.parameters.print_grid {
             let mut shapes_to_draw : Vec<usize> = (0..self.grid.tiles.len()).collect();
             let mut next_shape_index = (shapes_to_draw.len() - 1) / 2;
             let mut start_vertex = 0 as usize;
@@ -110,7 +117,6 @@ impl Application {
                 current_position = current_vertex;
             }
         }
-    */
 
         let mut current_position = Vec2::new(0_f32, 0_f32);
         for instruction in &self.instructions {
@@ -197,7 +203,7 @@ impl Application
     }
 
     pub fn random_walk_into_instrution(&mut self) {
-        self.grid.random_walk(self.walk_parameters, &mut self.instructions);
+        self.grid.random_walk(self.parameters.walk_parameters, &mut self.instructions);
     }
 
     pub fn sign_into_instructions(&mut self) {
@@ -220,7 +226,7 @@ impl ggez::event::EventHandler<GameError> for Application {
         if was_pressed != self.is_mouse_down {
             if self.is_mouse_down {
                 self.instructions.clear();
-                self.animation_frame = 0;
+                self.animation_frame = match self.parameters.animate_instructions { true => 0, false => -20};
                 self.random_walk_into_instrution();
                 self.sign_into_instructions();
             }
@@ -251,11 +257,12 @@ impl ggez::event::EventHandler<GameError> for Application {
         
         let has_filled_mesh_builder = Application::fill_mesh_builder(&self.instructions, self.animation_frame / 4, mb);
 
-        /*
-        for tile in &self.grid.tiles {
-            mb.polygon(graphics::DrawMode::Stroke(graphics::StrokeOptions::default().with_line_width(2_f32)), &tile.vertices, graphics::Color::BLACK).unwrap();
+        if self.parameters.display_grid
+        {
+            for tile in &self.grid.tiles {
+                mb.polygon(graphics::DrawMode::Stroke(graphics::StrokeOptions::default().with_line_width(2_f32)), &tile.vertices, graphics::Color::BLACK).unwrap();
+            }
         }
-        */
         
         if has_filled_mesh_builder {
             let mesh = mb.build(ctx)?;

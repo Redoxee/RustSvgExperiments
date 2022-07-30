@@ -7,10 +7,10 @@ use std::collections::HashSet;
 use crate::utils::*;
 
 pub struct TileInfo {
-    index : usize,
-    position : Vec2,
-    neighbors : Vec<usize>,
-    vertices : Vec<Vec2>,
+    pub index : usize,
+    pub position : Vec2,
+    pub neighbors : Vec<usize>,
+    pub vertices : Vec<Vec2>,
 }
 
 impl TileInfo {
@@ -25,8 +25,8 @@ impl TileInfo {
 }
 
 pub struct Grid {
-    tiles : Vec<TileInfo>,
-    tile_scale : f32,
+    pub tiles : Vec<TileInfo>,
+    pub tile_scale : f32,
 }
 
 #[derive(Copy, Clone)]
