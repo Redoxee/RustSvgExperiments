@@ -1,13 +1,12 @@
 use std::fs;
 use std::collections::HashMap;
 
-
 use std::str::from_utf8;
 use glam::Vec2;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
-use crate::utils::Instruction;
+use crate::utils::*;
 
 pub struct Sigil {
     path : Vec<Instruction>,
